@@ -55,12 +55,15 @@ void testXcorr(
     printf("x:\t"); for(i=0;i<tdims;i++) printf("%d\t", xDims[i]); printf("\n");
 
     // w, dw
-    cudnnErrchk( cudnnSetFilterNdDescriptor(wDesc, CUDNN_DATA_DOUBLE, tdims, wDims) );
-    cudnnErrchk( cudnnSetFilterNdDescriptor(dwDesc, CUDNN_DATA_DOUBLE, tdims, wDims) );
+    //cudnnErrchk( cudnnSetFilterNdDescriptor(wDesc, CUDNN_DATA_DOUBLE, tdims, wDims) );
+    cudnnErrchk( cudnnSetFilterNdDescriptor(wDesc, CUDNN_DATA_DOUBLE, CUDNN_TENSOR_NCHW, tdims, wDims) );
+    //cudnnErrchk( cudnnSetFilterNdDescriptor(dwDesc, CUDNN_DATA_DOUBLE, tdims, wDims) );
+    cudnnErrchk( cudnnSetFilterNdDescriptor(dwDesc, CUDNN_DATA_DOUBLE, CUDNN_TENSOR_NCHW, tdims, wDims) );
     printf("w:\t"); for(i=0;i<tdims;i++) printf("%d\t", wDims[i]); printf("\n");
 
     // conv
-    cudnnErrchk( cudnnSetConvolutionNdDescriptor(convDesc, cdims, convPad, convStride, convUpscale, CUDNN_CROSS_CORRELATION) );
+    //cudnnErrchk( cudnnSetConvolutionNdDescriptor(convDesc, cdims, convPad, convStride, convUpscale, CUDNN_CROSS_CORRELATION) );
+    cudnnErrchk( cudnnSetConvolutionNdDescriptor(convDesc, cdims, convPad, convStride, convUpscale, CUDNN_CROSS_CORRELATION, CUDNN_DATA_DOUBLE ) );
     printf("p:\t"); printf("\t\t"); for(i=0;i<cdims;i++) printf("%d\t", convPad[i]); printf("\tpadding\n");
     printf("s:\t"); printf("\t\t"); for(i=0;i<cdims;i++) printf("%d\t", convStride[i]); printf("\tstride\n");
 
@@ -120,21 +123,34 @@ void testXcorr(
     // forward test
 
     // forward algo conf & workspace
+#if (CUDNN_VERSION < 8000)
     cudnnConvolutionFwdAlgo_t convFwdAlgo;
     cudnnConvolutionFwdPreference_t convFwdPref = CUDNN_CONVOLUTION_FWD_NO_WORKSPACE;
     void *workSpace = NULL; size_t workSpaceSize = 0, memLimit=0;
     cudnnErrchk( cudnnGetConvolutionForwardAlgorithm(handle, xDesc, wDesc, convDesc, yDesc, convFwdPref, memLimit, &convFwdAlgo) );
     cudnnErrchk( cudnnGetConvolutionForwardWorkspaceSize(handle, xDesc, wDesc, convDesc, yDesc, convFwdAlgo, &workSpaceSize) );
     // end forward algo conf & workspace
+#else
+    void *workSpace = nullptr;
+    size_t workSpaceSize = 0;
+    int memLimit = 0;
+    cudnnConvolutionFwdAlgoPerf_t convFwdAlgo;
+    cudnnErrchk( cudnnFindConvolutionForwardAlgorithm(handle, xDesc, wDesc, convDesc, yDesc, 1, &memLimit, &convFwdAlgo) );
+    //cudnnErrchk( cudnnGetConvolutionForwardWorkspaceSize(handle, xDesc, wDesc, convDesc, yDesc, convFwdAlgo.algo, &workSpaceSize) );
+    workSpaceSize = convFwdAlgo.memory;    
+#endif
+    
 
     printf("\ny:\n");
     double alpha=1, beta=1; //scaling params for input and output
-    cudnnErrchk( kudnnConvolutionForward(handle, &alpha, xDesc, x_d, wDesc, w_d, convDesc, convFwdAlgo, workSpace, workSpaceSize, &beta, yDesc, y_d) );
+    //cudnnErrchk( kudnnConvolutionForward(handle, &alpha, xDesc, x_d, wDesc, w_d, convDesc, convFwdAlgo, workSpace, workSpaceSize, &beta, yDesc, y_d) );
+    cudnnErrchk( kudnnConvolutionForward(handle, &alpha, xDesc, x_d, wDesc, w_d, convDesc, convFwdAlgo.algo, workSpace, workSpaceSize, &beta, yDesc, y_d) );
     gpuErrchk( cudaMemcpy(y_h, y_d, sizeof(double)*prod(yDims,tdims), cudaMemcpyDeviceToHost) );
     if(verbose){ print2Dd(y_h, yDims[2], yDims[3]); printf("\n");} 
 
     if(compare){
-        cudnnErrchk( cudnnConvolutionForward(handle, &alpha, xDesc, x_d, wDesc, w_d, convDesc, convFwdAlgo, workSpace, workSpaceSize, &beta, yDesc, y1_d) );
+        // cudnnErrchk( cudnnConvolutionForward(handle, &alpha, xDesc, x_d, wDesc, w_d, convDesc, convFwdAlgo, workSpace, workSpaceSize, &beta, yDesc, y1_d) );
+	cudnnErrchk( cudnnConvolutionForward(handle, &alpha, xDesc, x_d, wDesc, w_d, convDesc, convFwdAlgo.algo, workSpace, workSpaceSize, &beta, yDesc, y1_d) );
         gpuErrchk( cudaMemcpy(y1_h, y1_d, sizeof(double)*prod(yDims,tdims), cudaMemcpyDeviceToHost) );
         if(verbose){ print2Dd(y1_h, yDims[2], yDims[3]); printf("\n");} 
         assert(eqseq(y_h,y1_h,prod(yDims,tdims)) < 1.0E-4);
@@ -148,8 +164,10 @@ void testXcorr(
     gpuErrchk( cudaMemcpy(dw_h, dw_d, sizeof(double)*prod(wDims,tdims), cudaMemcpyDeviceToHost) );
     if(verbose){ print2Dd(dw_h, wDims[2], wDims[3]); printf("\n"); }
 
-    if(compare){
-        cudnnErrchk( cudnnConvolutionBackwardFilter(handle, &alpha, xDesc, x_d, dyDesc, dy_d, convDesc, &beta, dwDesc, dw1_d) );
+    if(compare) {
+	auto algoType = CUDNN_CONVOLUTION_BWD_FILTER_ALGO_FFT_TILING;    
+        //cudnnErrchk( cudnnConvolutionBackwardFilter(handle, &alpha, xDesc, x_d, dyDesc, dy_d, convDesc, &beta, dwDesc, dw1_d) );
+	cudnnErrchk( cudnnConvolutionBackwardFilter(handle, &alpha, xDesc, x_d, dyDesc, dy_d, convDesc, algoType, workSpace, workSpaceSize, &beta, dwDesc, dw1_d) );  
         gpuErrchk( cudaMemcpy(dw1_h, dw1_d, sizeof(double)*prod(wDims,tdims), cudaMemcpyDeviceToHost) );
         if(verbose){ print2Dd(dw1_h, wDims[2], wDims[3]); printf("\n"); }
         assert(eqseq(dw_h,dw1_h,prod(wDims,tdims)) < 1.0E-4);
@@ -163,8 +181,10 @@ void testXcorr(
     gpuErrchk( cudaMemcpy(dx_h, dx_d, sizeof(double)*prod(xDims,tdims), cudaMemcpyDeviceToHost) );
     if(verbose){ print2Dd(dx_h, xDims[2], xDims[3]); printf("\n"); }
 
-    if(compare){
-        cudnnErrchk( cudnnConvolutionBackwardData(handle, &alpha, wDesc, w_d, dyDesc, dy_d, convDesc, &beta, dxDesc, dx1_d) );
+    if(compare) {
+	auto algoBwdDataType = CUDNN_CONVOLUTION_BWD_DATA_ALGO_FFT_TILING;
+        //cudnnErrchk( cudnnConvolutionBackwardData(handle, &alpha, wDesc, w_d, dyDesc, dy_d, convDesc, &beta, dxDesc, dx1_d) );
+	cudnnErrchk ( cudnnConvolutionBackwardData(handle, &alpha, wDesc, w_d, dyDesc, dy_d, convDesc, algoBwdDataType, workSpace, workSpaceSize, &beta, dxDesc, dx1_d) );
         gpuErrchk( cudaMemcpy(dx1_h, dx1_d, sizeof(double)*prod(xDims,tdims), cudaMemcpyDeviceToHost) );
         if(verbose){ print2Dd(dx1_h, xDims[2], xDims[3]); printf("\n"); }
         assert(eqseq(dx_h,dx1_h,prod(xDims,tdims)) < 1.0E-4);

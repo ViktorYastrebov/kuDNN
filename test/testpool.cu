@@ -36,7 +36,8 @@ void testPooling(
     // end create
 
     // set
-    cudnnErrchk( cudnnSetPoolingNdDescriptor(poolDesc, CUDNN_POOLING_MAX, pdims, poolDims, poolPad, poolStride) );
+    // cudnnErrchk( cudnnSetPoolingNdDescriptor(poolDesc, CUDNN_POOLING_MAX, pdims, poolDims, poolPad, poolStride) );
+    cudnnErrchk( cudnnSetPoolingNdDescriptor(poolDesc, CUDNN_POOLING_MAX, CUDNN_NOT_PROPAGATE_NAN, pdims, poolDims, poolPad, poolStride) );
 
     dims2strides(xDims, tdims, xStrides);
     cudnnErrchk( cudnnSetTensorNdDescriptor(xDesc, CUDNN_DATA_DOUBLE, tdims, xDims, xStrides) );
