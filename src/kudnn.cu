@@ -38,14 +38,16 @@ cudnnStatus_t CUDNNWINAPI kudnnConvolutionForward(        cudnnHandle_t         
     cudnnGetTensorNdDescriptor(srcDesc,  ndimsreq, &dataType, &xndims, xDims, xStrides);
 
     // w
-    cudnnGetFilterNdDescriptor(filterDesc, ndimsreq, &dataType, &wndims, wDims);
+    cudnnTensorFormat_t tensor_format;
+    cudnnGetFilterNdDescriptor(filterDesc, ndimsreq, &dataType, &tensor_format,  &wndims, wDims);
     assert(xndims == wndims);
 
     // y
     cudnnGetTensorNdDescriptor(destDesc,  ndimsreq, &dataType, &yndims, yDims, yStrides);
     assert(xndims == yndims);
 
-    cudnnGetConvolutionNdDescriptor(convDesc, convndimsreq, &convndims, convPad, convStride, convUpscale, &mode);
+    cudnnDataType_t dtype;
+    cudnnGetConvolutionNdDescriptor(convDesc, convndimsreq, &convndims, convPad, convStride, convUpscale, &mode, &dtype);
     assert(convndims==(xndims-2)); for(i=0; i<convndims; i++) assert(convStride[i]==1); for(i=0; i<convndims; i++) assert(convUpscale[i]==1);
 
     if(xndims == 4){ // 4-D
@@ -104,10 +106,12 @@ cudnnStatus_t CUDNNWINAPI kudnnConvolutionBackwardFilter( cudnnHandle_t         
     assert(xndims == dyndims);
 
     // dw
-    cudnnGetFilterNdDescriptor(gradDesc, ndimsreq, &dataType, &dwndims, dwDims);
+    cudnnTensorFormat_t tensor_format;
+    cudnnGetFilterNdDescriptor(gradDesc, ndimsreq, &dataType, &tensor_format, &dwndims, dwDims);
     assert(xndims == dwndims);
 
-    cudnnGetConvolutionNdDescriptor(convDesc, convndimsreq, &convndims, convPad, convStride, convUpscale, &mode);
+    cudnnDataType_t dtype;
+    cudnnGetConvolutionNdDescriptor(convDesc, convndimsreq, &convndims, convPad, convStride, convUpscale, &mode, &dtype);
     assert(convndims==(xndims-2)); for(i=0; i<convndims; i++) assert(convStride[i]==1); for(i=0; i<convndims; i++) assert(convUpscale[i]==1);
 
     if(xndims == 4){ // 4-D
@@ -162,13 +166,14 @@ cudnnStatus_t CUDNNWINAPI kudnnConvolutionBackwardData(  cudnnHandle_t          
     cudnnGetTensorNdDescriptor(diffDesc,  ndimsreq, &dataType, &dyndims, dyDims, dyStrides);
 
     // w
-    cudnnGetFilterNdDescriptor(filterDesc, ndimsreq, &dataType, &wndims, wDims);
+    cudnnTensorFormat_t tensor_format;
+    cudnnGetFilterNdDescriptor(filterDesc, ndimsreq, &dataType, &tensor_format, &wndims, wDims);
 
     // dx
     cudnnGetTensorNdDescriptor(gradDesc,  ndimsreq, &dataType, &dxndims, dxDims, dxStrides);
     assert(dxndims == dyndims); assert(dxndims == wndims);
 
-    cudnnGetConvolutionNdDescriptor(convDesc, convndimsreq, &convndims, convPad, convStride, convUpscale, &mode);
+    cudnnGetConvolutionNdDescriptor(convDesc, convndimsreq, &convndims, convPad, convStride, convUpscale, &mode, &dataType);
     assert(convndims==(dxndims-2)); for(i=0; i<convndims; i++) assert(convStride[i]==1); for(i=0; i<convndims; i++) assert(convUpscale[i]==1);
 
     if(dxndims == 4){ // 4-D
@@ -256,7 +261,8 @@ cudnnStatus_t CUDNNWINAPI kudnnPoolingForward(  cudnnHandle_t handle,
     cudnnGetTensorNdDescriptor(destDesc,  ndimsreq, &dataType, &yndims, yDims, yStrides);
     assert(xndims == yndims);
 
-    cudnnGetPoolingNdDescriptor(poolingDesc, poolndimsreq, &mode, &poolndims, poolDims, poolPad, poolStride);
+    cudnnNanPropagation_t nan_prop;
+    cudnnGetPoolingNdDescriptor(poolingDesc, poolndimsreq, &mode, &nan_prop, &poolndims, poolDims, poolPad, poolStride);
     for(i=0;i<poolndims;i++) assert(poolDims[i]>=poolStride[i]);
 
     if(xndims == 4){ // 4-D
@@ -321,7 +327,8 @@ cudnnStatus_t CUDNNWINAPI kudnnPoolingBackward( cudnnHandle_t                   
     // dx
     cudnnGetTensorNdDescriptor(destDiffDesc,  ndimsreq, &dataType, &dxndims, dxDims, dxStrides);
 
-    cudnnGetPoolingNdDescriptor(poolingDesc, poolndimsreq, &mode, &poolndims, poolDims, poolPad, poolStride);
+    cudnnNanPropagation_t nan_prop;
+    cudnnGetPoolingNdDescriptor(poolingDesc, poolndimsreq, &mode, &nan_prop, &poolndims, poolDims, poolPad, poolStride);
     for(i=0;i<poolndims;i++) assert(poolDims[i]>=poolStride[i]);
 
     if(xndims == 4){ // 4-D
