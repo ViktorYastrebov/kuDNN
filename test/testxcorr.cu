@@ -80,13 +80,34 @@ void testXcorr(
     // end set input and conf
 
     srand(time(NULL));
-    double xData[prod(xDims,tdims)];    fillRandom(xData,   prod(xDims,tdims));
-    double wData[prod(wDims,tdims)];    fillRandom(wData,   prod(wDims,tdims));
-    double dyData[prod(yDims,tdims)];   fillRandom(dyData,  prod(yDims,tdims));
+    //RUNTIME static array initialization ???
+    
+    const auto xDataProd = prod(xDims, tdims);
+    double *xData = new double[xDataProd];
+    fillRandom(xData, xDataProd);
+    const auto wDataProd = prod(wDims, tdims);
+    double *wData = new double[wDataProd];
+    fillRandom(wData, wDataProd);
+    const auto dyDataProd = prod(yDims, tdims);
+    double *dyData = new double[dyDataProd];
+    fillRandom(dyData, dyDataProd);
+
+    //double xData[prod(xDims,tdims)];    fillRandom(xData,   prod(xDims,tdims));
+    //double wData[prod(wDims,tdims)];    fillRandom(wData,   prod(wDims,tdims));
+    //double dyData[prod(yDims,tdims)];   fillRandom(dyData,  prod(yDims,tdims));
 
     double *x_h = &xData[0],            *w_h = &wData[0],           *dy_h=&dyData[0];                       // given
-    double dx_h[prod(xDims,tdims)],     dw_h[prod(wDims,tdims)],    y_h[prod(yDims,tdims)],     db_h[K];    // compute kudnn
-    double dx1_h[prod(xDims,tdims)],    dw1_h[prod(wDims,tdims)],   y1_h[prod(yDims,tdims)],    db1_h[K];   // compute cudnn
+    //double dx_h[prod(xDims,tdims)],     dw_h[prod(wDims,tdims)],    y_h[prod(yDims,tdims)],     db_h[K];    // compute kudnn
+    //double dx1_h[prod(xDims,tdims)],    dw1_h[prod(wDims,tdims)],   y1_h[prod(yDims,tdims)],    db1_h[K];   // compute cudnn
+    double *dx_h = new double[xDataProd];
+    double *dw_h = new double[wDataProd];
+    double *y_h = new double[dyDataProd];
+    double *db_h = new double[K];
+    double *dx1_h = new double[xDataProd];
+    double *dw1_h = new double[wDataProd];
+    double *y1_h = new double[dyDataProd];
+    double *db1_h = new double[K];
+
     double *x_d, *w_d, *dy_d; // gpu pointers
     double *y_d,    *dw_d,  *dx_d,  *db_d;       // compute kudnn
     double *y1_d,   *dw1_d, *dx1_d, *db1_d;      // compute cudnn
@@ -140,7 +161,6 @@ void testXcorr(
     workSpaceSize = convFwdAlgo.memory;    
 #endif
     
-
     printf("\ny:\n");
     double alpha=1, beta=1; //scaling params for input and output
     //cudnnErrchk( kudnnConvolutionForward(handle, &alpha, xDesc, x_d, wDesc, w_d, convDesc, convFwdAlgo, workSpace, workSpaceSize, &beta, yDesc, y_d) );
@@ -206,6 +226,19 @@ void testXcorr(
     }
     printf("db: ok.\n\n");
     // end backward bias test
+
+    delete[] xData;
+    delete[] wData;
+    delete[] dyData;
+
+    delete[] dx_h;
+    delete[] dw_h;
+    delete[] y_h;
+    delete[] db_h;
+    delete[] dx1_h;
+    delete[] dw1_h;
+    delete[] y1_h;
+    delete[] db1_h;
 
     printf("ok.\n");
     /*
